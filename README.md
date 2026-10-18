@@ -1,4 +1,4 @@
-﻿# Davi Semáforo
+# Davi Semáforo
 
 Simulação simples em Python e Pygame dos sinais de um cruzamento sobre o mapa.
 **Os tempos e grupos atuais são fictícios.**
@@ -21,9 +21,13 @@ python -m venv .venv
 - Clique em **Voltar ao tempo real**, ou pressione **Home**, para zerá-lo.
 - Feche a janela para sair.
 
-Cada indicador mostra sua identificação e uma luz com a cor atual. A borda
-identifica o tipo, descrito na lista ao lado. As setas apontam para o lado que
-vê a luz, conforme a interpretação aproximada do desenho de referência.
+A janela tem no máximo 720 pixels de altura e se ajusta a telas menores.
+O mapa exibe apenas a região dos sinais, com as margens vazias recortadas.
+
+Cada indicador mostra uma luz com a cor atual. A borda identifica o tipo,
+conforme a legenda abaixo do mapa. Passe o mouse sobre um sinal para ver
+sua identificação, tipo e estado. A pequena marca na borda indica o lado
+que vê a luz; o sinal de ônibus usa uma seta luminosa à esquerda.
 
 Há seis sinais convencionais (V1–V6), um de conversão à esquerda de ônibus
 (O1), quatro travessias de pedestres (P1–P4) e duas de ciclistas (C1–C2).

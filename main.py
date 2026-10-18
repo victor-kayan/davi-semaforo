@@ -42,24 +42,29 @@ def calcular_estados(horario):
 
 def main():
     pygame.init()
-    tela = pygame.display.set_mode((1000, 920))
+    altura = min(720, pygame.display.Info().current_h - 80)
+    largura = 760
+    tela = pygame.display.set_mode((largura, altura))
     pygame.display.set_caption("Davi Semáforo")
     fonte = pygame.font.SysFont("arial", 18)
     pequena = pygame.font.SysFont("arial", 14)
     relogio = pygame.time.Clock()
 
     mapa = pygame.image.load(str(Path(__file__).with_name("mapa.jpeg"))).convert()
-    escala = min(620 / mapa.get_width(), 700 / mapa.get_height())
+    # Recorta apenas as margens sem sinais para aproveitar melhor a tela.
+    recorte = pygame.Rect(0, 230, mapa.get_width(), 1030)
+    mapa = mapa.subsurface(recorte)
+    escala = min((largura - 40) / mapa.get_width(), (altura - 190) / mapa.get_height())
     tamanho = (round(mapa.get_width() * escala), round(mapa.get_height() * escala))
     mapa = pygame.transform.smoothscale(mapa, tamanho)
-    origem = (int((640 - tamanho[0]) / 2), 105)
-    slider = pygame.Rect(100, 851, 620, 8)
-    botao = pygame.Rect(760, 826, 210, 42)
+    origem = ((largura - tamanho[0]) // 2, 70)
+    slider = pygame.Rect(30, altura - 49, largura - 250, 6)
+    botao = pygame.Rect(largura - 185, altura - 66, 155, 36)
     deslocamento = 0
     arrastando = False
     executando = True
 
-    def texto(conteudo, posicao, cor=(235, 238, 245), pequeno=False):
+    def texto(conteudo, posicao, cor=(225, 230, 238), pequeno=False):
         tela.blit((pequena if pequeno else fonte).render(conteudo, True, cor), posicao)
 
     while executando:
@@ -69,7 +74,7 @@ def main():
             elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
                 if botao.collidepoint(evento.pos):
                     deslocamento = 0
-                elif slider.inflate(24, 32).collidepoint(evento.pos):
+                elif slider.inflate(20, 30).collidepoint(evento.pos):
                     arrastando = True
             elif evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
                 arrastando = False
@@ -83,75 +88,67 @@ def main():
 
         agora = datetime.now()
         simulado = agora + timedelta(seconds=deslocamento)
-        estados, fase = calcular_estados(simulado)
+        estados, _ = calcular_estados(simulado)
         tela.fill((25, 30, 40))
-        texto("Davi Semáforo — dados fictícios", (25, 15))
-        texto(f"Relógio real: {agora:%d/%m/%Y %H:%M:%S}", (25, 45))
-        texto(f"Horário simulado: {simulado:%d/%m/%Y %H:%M:%S}", (25, 73))
+        texto("Davi Semáforo", (25, 12))
+        texto("Dados fictícios", (largura - 112, 16), (150, 160, 175), pequeno=True)
+        texto(f"Relógio real  {agora:%H:%M:%S}", (25, 39))
+        texto(f"Simulação  {simulado:%H:%M:%S}", (largura - 210, 39))
         tela.blit(mapa, origem)
 
-        texto("Sinais", (665, 110))
-        texto(f"Fase {fase} / {len(FASES)} | ciclo de {DURACAO_CICLO}s", (665, 141))
-        for indice, (identificacao, tipo, (x, y), direcao) in enumerate(SINAIS):
+        detalhes = None
+        mouse = pygame.mouse.get_pos()
+        for identificacao, tipo, (x, y), direcao in SINAIS:
             x = origem[0] + round(x * escala)
-            y = origem[1] + round(y * escala)
-            # Afasta os indicadores próximos e liga-os ao ponto original.
-            ajustes = {"P2": (15, -32), "V2": (20, 12), "O1": (4, 0), "P4": (-20, -18)}
-            ajuste_x, ajuste_y = ajustes.get(identificacao, (0, 0))
-            pygame.draw.line(tela, (70, 75, 85), (x, y), (x + ajuste_x, y + ajuste_y), 1)
-            x += ajuste_x
-            y += ajuste_y
+            y = origem[1] + round((y - recorte.top) * escala)
+            # Separa o par de sinais mais próximo sem alterar a configuração.
+            if identificacao == "P2":
+                y -= 5
+            elif identificacao == "V2":
+                y += 3
             nome, borda = TIPOS[tipo]
             cor = CORES[estados[identificacao]]
-
-            # A luz mostra o estado; a borda identifica o tipo.
-            caixa = pygame.Rect(x - 13, y - 19, 26, 38)
-            pygame.draw.rect(tela, (25, 30, 40), caixa, border_radius=5)
-            pygame.draw.rect(tela, borda, caixa, width=2, border_radius=5)
+            pygame.draw.circle(tela, (25, 30, 40), (x, y), 12)
+            pygame.draw.circle(tela, borda, (x, y), 12, width=2)
             if tipo == "onibus":
-                pygame.draw.line(tela, cor, (x - 7, y - 5), (x + 7, y - 5), 3)
-                pygame.draw.polygon(tela, cor, [(x - 8, y - 5), (x, y - 11), (x, y + 1)])
+                pygame.draw.line(tela, cor, (x - 6, y), (x + 6, y), 3)
+                pygame.draw.polygon(tela, cor, [(x - 7, y), (x, y - 5), (x, y + 5)])
             else:
-                pygame.draw.circle(tela, cor, (x, y - 5), 7)
-            texto(identificacao, (x - 10, y + 4), pequeno=True)
+                pygame.draw.circle(tela, cor, (x, y), 7)
 
-            # A seta externa aponta para o lado que vê a luz.
+            # Uma pequena marca indica o lado que vê a luz.
             if direcao:
                 dx, dy = {"esquerda": (-1, 0), "cima": (0, -1), "baixo": (0, 1)}[direcao]
-                inicio = (x + dx * 21, y + dy * 25)
-                ponta = (x + dx * 32, y + dy * 36)
-                pygame.draw.line(tela, borda, inicio, ponta, 2)
-                pygame.draw.polygon(tela, borda, [
-                    ponta,
-                    (ponta[0] - dx * 6 + dy * 4, ponta[1] - dy * 6 - dx * 4),
-                    (ponta[0] - dx * 6 - dy * 4, ponta[1] - dy * 6 + dx * 4),
-                ])
+                pygame.draw.line(tela, borda, (x + dx * 12, y + dy * 12),
+                                 (x + dx * 17, y + dy * 17), 3)
+            if pygame.Rect(x - 14, y - 14, 28, 28).collidepoint(mouse):
+                detalhes = f"{identificacao} · {nome} · {estados[identificacao]}"
 
-            linha = 183 + indice * 40
-            pygame.draw.circle(tela, cor, (675, linha + 9), 6)
-            texto(f"{identificacao}  {nome}", (690, linha), borda)
-            texto(estados[identificacao], (690, linha + 19), pequeno=True)
+        # Os nomes e estados aparecem apenas ao passar o mouse sobre um sinal.
+        if detalhes:
+            pygame.draw.rect(tela, (25, 30, 40), (20, altura - 153, 440, 26), border_radius=4)
+            texto(detalhes, (25, altura - 148), pequeno=True)
 
-        texto("Setas: lado que vê a luz", (665, 732), pequeno=True)
-        texto("O1: conversão à esquerda de ônibus", (665, 754), pequeno=True)
-        texto("Posições e orientações aproximadas", (665, 776), pequeno=True)
+        for indice, (nome, cor) in enumerate(TIPOS.values()):
+            x = 30 + indice * 180
+            pygame.draw.circle(tela, cor, (x, altura - 111), 4)
+            texto(nome, (x + 11, altura - 120), pequeno=True)
 
         segundos = abs(deslocamento)
         sinal = "+" if deslocamento >= 0 else "−"
         diferenca = f"{sinal}{segundos // 3600:02}:{segundos % 3600 // 60:02}:{segundos % 60:02}"
-        modo = "TEMPO REAL" if deslocamento == 0 else f"Deslocamento: {diferenca}"
-        texto(modo, (100, 815))
-        pygame.draw.rect(tela, (105, 115, 135), slider, border_radius=4)
-        centro = slider.centerx
-        pygame.draw.line(tela, (235, 238, 245), (centro, 843), (centro, 867), 2)
+        modo = "Tempo real" if deslocamento == 0 else f"Deslocamento {diferenca}"
+        texto(modo, (30, altura - 88), pequeno=True)
+        pygame.draw.rect(tela, (80, 90, 110), slider, border_radius=3)
+        pygame.draw.line(tela, (160, 170, 185), (slider.centerx, slider.y - 4),
+                         (slider.centerx, slider.bottom + 4))
         cursor = slider.left + round((deslocamento + LIMITE) / (2 * LIMITE) * slider.width)
-        pygame.draw.circle(tela, (90, 170, 255), (cursor, slider.centery), 11)
-        texto("−3 horas", (100, 877), pequeno=True)
-        texto("Agora", (centro - 19, 877), pequeno=True)
-        texto("+3 horas", (665, 877), pequeno=True)
-        pygame.draw.rect(tela, (55, 80, 115), botao, border_radius=6)
-        texto("Voltar ao tempo real", (botao.x + 23, botao.y + 10))
-        texto("Atalho: Home", (805, 878), pequeno=True)
+        pygame.draw.circle(tela, (115, 175, 235), (cursor, slider.centery), 8)
+        texto("−3 h", (slider.left, altura - 30), pequeno=True)
+        texto("Agora", (slider.centerx - 18, altura - 30), pequeno=True)
+        texto("+3 h", (slider.right - 28, altura - 30), pequeno=True)
+        pygame.draw.rect(tela, (45, 60, 80), botao, border_radius=6)
+        texto("Voltar ao tempo real", (botao.x + 19, botao.y + 9), pequeno=True)
 
         pygame.display.flip()
         relogio.tick(30)
@@ -161,3 +158,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
