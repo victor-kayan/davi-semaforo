@@ -47,6 +47,9 @@ Edite `config.py` para substituir os dados fictícios:
   da face visível. Para as travessias, a direção é `None`.
 - `FASES`: duração em segundos, sinais verdes e sinais amarelos, nessa ordem.
   Todos os sinais omitidos em uma fase ficam vermelhos.
+- `FLUXOS`: sinal que controla o trajeto, tipo de agente, velocidade em pixels
+  por segundo, intervalo de chegada em segundos e pontos do caminho.
+  O segundo ponto é a posição de parada, antes da travessia.
 
 Por exemplo, `(25, ["V2", "V3"], [])` deixa V2 e V3 verdes por 25 segundos,
 com todos os demais vermelhos. `(2, [], [])` deixa todos vermelhos por 2 segundos.
@@ -59,9 +62,26 @@ O programa calcula `(horário simulado - referência) % duração do ciclo`.
 Abrir o programa em outro momento não reinicia o ciclo. O relógio usado é o do
 computador, no horário local; mantenha-o sincronizado para comparar com a rua.
 
+## Trânsito animado
+
+Carros, ônibus, pessoas e bicicletas percorrem trajetos fixos e fictícios.
+Os desenhos são feitos no Pygame, sem imagens externas ou novas dependências.
+Cada trajeto é uma sequência de segmentos entre os pontos de `FLUXOS`.
+
+Os agentes param antes da travessia no vermelho ou amarelo, mantendo espaço
+para quem está à frente. No verde, a fila avança. Quem já passou do ponto de
+parada continua até concluir o trajeto, mesmo se o sinal mudar.
+O ônibus tem um caminho com conversão à esquerda.
+
+Ao alterar o deslocamento pelo slider ou voltar ao tempo real, os fluxos
+reiniciam. O slider muda o horário dos sinais; não reproduz um histórico de
+veículos. Quantidades, velocidades e trajetos são ilustrativos. O modelo
+mantém distância dentro de cada fila, sem resolver conflitos entre trajetos.
+
 ## Arquivos
 
 - `main.py`: cálculo dos estados, desenho e controles.
 - `config.py`: dados editáveis dos sinais e do ciclo.
+- `transito.py`: movimento dos agentes, filas e desenhos do trânsito.
 - `mapa.jpeg`: imagem de fundo.
 - `requirements.txt`: dependência Pygame.

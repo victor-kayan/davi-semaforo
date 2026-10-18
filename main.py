@@ -6,6 +6,7 @@ from pathlib import Path
 import pygame
 
 from config import FASES, REFERENCIA, SINAIS
+from transito import Transito
 
 
 CORES = {
@@ -108,11 +109,14 @@ def main():
     deslocamento = 0
     arrastando = False
     executando = True
+    transito = Transito()
+    deslocamento_anterior = 0
 
     def texto(conteudo, posicao, cor=(225, 230, 238), pequeno=False):
         tela.blit((pequena if pequeno else fonte).render(conteudo, True, cor), posicao)
 
     while executando:
+        segundos = min(relogio.tick(30) / 1000, 0.1)
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 executando = False
@@ -134,12 +138,20 @@ def main():
         agora = datetime.now()
         simulado = agora + timedelta(seconds=deslocamento)
         estados, _ = calcular_estados(simulado)
+        # Ao buscar outro horário, começa um novo fluxo naquele instante.
+        if deslocamento != deslocamento_anterior:
+            transito = Transito()
+            deslocamento_anterior = deslocamento
+        transito.atualizar(segundos, estados)
         tela.fill((25, 30, 40))
         texto("Davi Semáforo", (25, 12))
         texto("Dados fictícios", (largura - 112, 16), (150, 160, 175), pequeno=True)
         texto(f"Relógio real  {agora:%H:%M:%S}", (25, 39))
         texto(f"Simulação  {simulado:%H:%M:%S}", (largura - 210, 39))
         tela.blit(mapa, origem)
+        tela.set_clip(pygame.Rect(origem, tamanho))
+        transito.desenhar(tela, origem, escala, recorte.top)
+        tela.set_clip(None)
 
         detalhes = None
         mouse = pygame.mouse.get_pos()
@@ -194,7 +206,6 @@ def main():
         texto("Voltar ao tempo real", (botao.x + 19, botao.y + 9), pequeno=True)
 
         pygame.display.flip()
-        relogio.tick(30)
 
     pygame.quit()
 
