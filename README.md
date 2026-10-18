@@ -24,10 +24,15 @@ python -m venv .venv
 A janela tem no máximo 720 pixels de altura e se ajusta a telas menores.
 O mapa exibe apenas a região dos sinais, com as margens vazias recortadas.
 
-Cada indicador mostra uma luz com a cor atual. A borda identifica o tipo,
-conforme a legenda abaixo do mapa. Passe o mouse sobre um sinal para ver
-sua identificação, tipo e estado. A pequena marca na borda indica o lado
-que vê a luz; o sinal de ônibus usa uma seta luminosa à esquerda.
+Os sinais de veículos têm três lâmpadas, com apenas a atual acesa;
+pedestres e ciclistas têm duas. A borda reforçada identifica o tipo na legenda. Cada sinal tem um
+rótulo curto: V para automóveis, O para ônibus, P para pedestres e C
+para ciclistas, seguido do número do sinal.
+A caixa gira conforme a face visível: a base fica do lado de quem vê
+a luz. A seta externa aponta o sentido do trânsito, da aproximação
+até o sinal. A seta dentro da lâmpada do ônibus indica sua conversão
+à esquerda. As travessias continuam com um indicador para ambos os lados.
+Passe o mouse sobre um sinal para ver identificação, tipo e estado.
 
 Há seis sinais convencionais (V1–V6), um de conversão à esquerda de ônibus
 (O1), quatro travessias de pedestres (P1–P4) e duas de ciclistas (C1–C2).

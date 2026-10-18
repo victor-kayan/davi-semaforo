@@ -40,6 +40,50 @@ def calcular_estados(horario):
         posicao -= duracao
 
 
+def desenhar_semaforo(tela, posicao, tipo, estado, direcao):
+    """A base fica voltada a quem vê a luz; a seta aponta o fluxo até ela."""
+    cores_lampadas = ["vermelho", "amarelo", "verde"]
+    if tipo in ("pedestre", "ciclista"):
+        cores_lampadas = ["vermelho", "verde"]
+    angulo = {None: 0, "baixo": 0, "cima": 180, "esquerda": 270, "direita": 90}[direcao]
+
+    altura_caixa = 12 * len(cores_lampadas) + 4
+    desenho = pygame.Surface((24, altura_caixa + 22), pygame.SRCALPHA)
+    caixa = pygame.Rect(2, 1, 20, altura_caixa)
+    pygame.draw.rect(desenho, (24, 26, 29), caixa, border_radius=4)
+    pygame.draw.rect(desenho, TIPOS[tipo][1], caixa, width=2, border_radius=4)
+    for indice, nome_cor in enumerate(cores_lampadas):
+        y = 9 + indice * 12
+        acesa = nome_cor == estado
+        cor = CORES[nome_cor] if acesa else (57, 60, 63)
+        pygame.draw.circle(desenho, (10, 12, 14), (12, y), 6)
+        pygame.draw.circle(desenho, cor, (12, y), 5)
+        if tipo == "onibus":
+            # A seta de conversão fica dentro da lâmpada acesa.
+            # Compensa o giro da caixa para manter a seta à esquerda no mapa.
+            vetor = pygame.Vector2(-1, 0).rotate(angulo)
+            centro = pygame.Vector2(12, y)
+            lado = pygame.Vector2(-vetor.y, vetor.x)
+            pygame.draw.line(desenho, (20, 22, 25), centro - vetor * 3, centro + vetor * 3, 2)
+            pygame.draw.polygon(desenho, (20, 22, 25),
+                                [centro + vetor * 4, centro + lado * 3, centro - lado * 3])
+        elif acesa:
+            pygame.draw.circle(desenho, (245, 245, 230), (10, y - 2), 1)
+
+    if direcao:
+        # No desenho original, a luz é vista de baixo e o fluxo sobe até ela.
+        base = altura_caixa + 4
+        pygame.draw.line(desenho, (28, 30, 33), (12, altura_caixa), (12, base), 4)
+        pygame.draw.line(desenho, (28, 30, 33), (12, base + 14), (12, base + 4), 2)
+        pygame.draw.polygon(desenho, (28, 30, 33),
+                            [(12, base + 3), (8, base + 8), (16, base + 8)])
+        desenho = pygame.transform.rotate(desenho, angulo)
+
+    area = desenho.get_rect(center=posicao)
+    tela.blit(desenho, area)
+    return area
+
+
 def main():
     pygame.init()
     altura = min(720, pygame.display.Info().current_h - 80)
@@ -48,6 +92,7 @@ def main():
     pygame.display.set_caption("Davi Semáforo")
     fonte = pygame.font.SysFont("arial", 18)
     pequena = pygame.font.SysFont("arial", 14)
+    rotulo = pygame.font.SysFont("arial", 11, bold=True)
     relogio = pygame.time.Clock()
 
     mapa = pygame.image.load(str(Path(__file__).with_name("mapa.jpeg"))).convert()
@@ -101,38 +146,36 @@ def main():
         for identificacao, tipo, (x, y), direcao in SINAIS:
             x = origem[0] + round(x * escala)
             y = origem[1] + round((y - recorte.top) * escala)
-            # Separa o par de sinais mais próximo sem alterar a configuração.
-            if identificacao == "P2":
-                y -= 5
-            elif identificacao == "V2":
-                y += 3
-            nome, borda = TIPOS[tipo]
-            cor = CORES[estados[identificacao]]
-            pygame.draw.circle(tela, (25, 30, 40), (x, y), 12)
-            pygame.draw.circle(tela, borda, (x, y), 12, width=2)
-            if tipo == "onibus":
-                pygame.draw.line(tela, cor, (x - 6, y), (x + 6, y), 3)
-                pygame.draw.polygon(tela, cor, [(x - 7, y), (x, y - 5), (x, y + 5)])
-            else:
-                pygame.draw.circle(tela, cor, (x, y), 7)
-
-            # Uma pequena marca indica o lado que vê a luz.
-            if direcao:
-                dx, dy = {"esquerda": (-1, 0), "cima": (0, -1), "baixo": (0, 1)}[direcao]
-                pygame.draw.line(tela, borda, (x + dx * 12, y + dy * 12),
-                                 (x + dx * 17, y + dy * 17), 3)
-            if pygame.Rect(x - 14, y - 14, 28, 28).collidepoint(mouse):
+            # Afasta os sinais próximos para que as caixas não se sobreponham.
+            ajustes = {"P2": (22, -20), "V2": (22, 20), "C1": (-6, -8), "P4": (-18, -12)}
+            dx, dy = ajustes.get(identificacao, (0, 0))
+            if dx or dy:
+                pygame.draw.line(tela, (95, 103, 112), (x, y), (x + dx, y + dy))
+            x += dx
+            y += dy
+            nome, cor_tipo = TIPOS[tipo]
+            area = desenhar_semaforo(tela, (x, y), tipo, estados[identificacao], direcao)
+            # Identificação curta, sempre horizontal, sem depender só da cor.
+            etiqueta = rotulo.render(identificacao, True, cor_tipo)
+            caixa_rotulo = etiqueta.get_rect(midbottom=(x, area.top - 2)).inflate(6, 2)
+            if identificacao == "V1":
+                caixa_rotulo.midtop = (x, area.bottom + 2)
+            pygame.draw.rect(tela, (25, 30, 40), caixa_rotulo, border_radius=3)
+            tela.blit(etiqueta, etiqueta.get_rect(center=caixa_rotulo.center))
+            if area.collidepoint(mouse):
                 detalhes = f"{identificacao} · {nome} · {estados[identificacao]}"
+                if direcao:
+                    detalhes += f" · visto de {direcao}"
 
-        # Os nomes e estados aparecem apenas ao passar o mouse sobre um sinal.
+        # Os detalhes aparecem apenas ao passar o mouse sobre um sinal.
         if detalhes:
-            pygame.draw.rect(tela, (25, 30, 40), (20, altura - 153, 440, 26), border_radius=4)
+            pygame.draw.rect(tela, (25, 30, 40), (20, altura - 153, 610, 26), border_radius=4)
             texto(detalhes, (25, altura - 148), pequeno=True)
 
-        for indice, (nome, cor) in enumerate(TIPOS.values()):
+        for indice, (tipo, (nome, cor)) in enumerate(TIPOS.items()):
             x = 30 + indice * 180
-            pygame.draw.circle(tela, cor, (x, altura - 111), 4)
-            texto(nome, (x + 11, altura - 120), pequeno=True)
+            prefixo = {"auto": "V", "onibus": "O", "pedestre": "P", "ciclista": "C"}[tipo]
+            texto(f"{prefixo} · {nome}", (x, altura - 120), cor, pequeno=True)
 
         segundos = abs(deslocamento)
         sinal = "+" if deslocamento >= 0 else "−"
