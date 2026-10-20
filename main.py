@@ -106,43 +106,68 @@ def main():
     origem = ((largura - tamanho[0]) // 2, 70)
     slider = pygame.Rect(30, altura - 49, largura - 250, 6)
     botao = pygame.Rect(largura - 185, altura - 66, 155, 36)
+    botoes_velocidade = {valor: pygame.Rect(365 + (valor - 1) * 59, altura - 94, 53, 27)
+                         for valor in (1, 2, 3)}
+    velocidade = 1
     deslocamento = 0
     arrastando = False
     executando = True
     transito = Transito(escala)
-    deslocamento_anterior = 0
 
     def texto(conteudo, posicao, cor=(225, 230, 238), pequeno=False):
         tela.blit((pequena if pequeno else fonte).render(conteudo, True, cor), posicao)
 
     while executando:
-        segundos = min(relogio.tick(30) / 1000, 0.1)
+        segundos = relogio.tick(30) / 1000
+        velocidade_passo = velocidade
+        reiniciar_transito = segundos > 0.5
+        # Acima de 1x, o horário simulado se afasta progressivamente do real.
+        deslocamento += segundos * (velocidade - 1)
+        if deslocamento >= LIMITE:
+            deslocamento = LIMITE
+            velocidade = 1
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 executando = False
             elif evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
                 if botao.collidepoint(evento.pos):
                     deslocamento = 0
+                    velocidade = 1
+                    reiniciar_transito = True
                 elif slider.inflate(20, 30).collidepoint(evento.pos):
                     arrastando = True
+                else:
+                    for valor, area in botoes_velocidade.items():
+                        if area.collidepoint(evento.pos):
+                            velocidade = valor
             elif evento.type == pygame.MOUSEBUTTONUP and evento.button == 1:
                 arrastando = False
             elif evento.type == pygame.KEYDOWN and evento.key == pygame.K_HOME:
                 deslocamento = 0
+                velocidade = 1
+                reiniciar_transito = True
 
         if arrastando:
             proporcao = (pygame.mouse.get_pos()[0] - slider.left) / slider.width
             proporcao = max(0, min(1, proporcao))
             deslocamento = round((proporcao * 2 - 1) * LIMITE)
+            reiniciar_transito = True
 
         agora = datetime.now()
         simulado = agora + timedelta(seconds=deslocamento)
         estados, _ = calcular_estados(simulado)
         # Ao buscar outro horário, começa um novo fluxo naquele instante.
-        if deslocamento != deslocamento_anterior:
+        if reiniciar_transito:
             transito = Transito(escala)
-            deslocamento_anterior = deslocamento
-        transito.atualizar(segundos, estados)
+        else:
+            # Passos curtos mantêm as paradas e transições mesmo em 3x.
+            restante = segundos * velocidade_passo
+            while restante > 0:
+                passo = min(restante, 1 / 30)
+                instante = simulado - timedelta(seconds=restante - passo)
+                estados_passo, _ = calcular_estados(instante)
+                transito.atualizar(passo, estados_passo)
+                restante -= passo
         tela.fill((25, 30, 40))
         texto("Davi Semáforo", (25, 12))
         texto("Coleta + ajustes", (largura - 120, 16), (150, 160, 175), pequeno=True)
@@ -182,11 +207,16 @@ def main():
             prefixo = {"auto": "V", "onibus": "O", "pedestre": "P", "ciclista": "C"}[tipo]
             texto(f"{prefixo} · {nome}", (x, altura - 120), cor, pequeno=True)
 
-        segundos = abs(deslocamento)
+        segundos = round(abs(deslocamento))
         sinal = "+" if deslocamento >= 0 else "−"
         diferenca = f"{sinal}{segundos // 3600:02}:{segundos % 3600 // 60:02}:{segundos % 60:02}"
-        modo = "Tempo real" if deslocamento == 0 else f"Deslocamento {diferenca}"
+        modo = "Tempo real" if deslocamento == 0 and velocidade == 1 else f"Deslocamento {diferenca}"
         texto(modo, (30, altura - 88), pequeno=True)
+        texto("Velocidade", (290, altura - 88), pequeno=True)
+        for valor, area in botoes_velocidade.items():
+            cor = (65, 110, 160) if valor == velocidade else (45, 55, 70)
+            pygame.draw.rect(tela, cor, area, border_radius=5)
+            texto(f"{valor}x", (area.x + 18, area.y + 5), pequeno=True)
         pygame.draw.rect(tela, (80, 90, 110), slider, border_radius=3)
         pygame.draw.line(tela, (160, 170, 185), (slider.centerx, slider.y - 4),
                          (slider.centerx, slider.bottom + 4))

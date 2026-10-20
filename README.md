@@ -20,11 +20,17 @@ python -m venv .venv
 - O topo mostra o relógio real e o horário usado na simulação.
 - Arraste o slider para deslocar o horário entre −3 e +3 horas.
 - Ao soltar o slider, o horário continua avançando com o deslocamento escolhido.
-- Clique em **Voltar ao tempo real**, ou pressione **Home**, para zerá-lo.
+- Use **1x**, **2x** ou **3x** para acelerar o relógio simulado, os ciclos
+  dos sinais e o movimento de todos os agentes juntos. O relógio real não muda.
+- Voltar a **1x** mantém o horário alcançado, avançando em velocidade normal.
+- Clique em **Voltar ao tempo real**, ou pressione **Home**, para zerar o
+  deslocamento e restaurar **1x**.
 - Feche a janela para sair.
 
 A janela tem no máximo 720 pixels de altura e se ajusta a telas menores.
 O mapa exibe apenas a região dos sinais, com as margens vazias recortadas.
+Em 2x e 3x, o deslocamento em relação ao relógio real cresce automaticamente.
+Ao alcançar +3 horas, a velocidade volta a 1x para respeitar o limite do slider.
 
 Os sinais de veículos têm três lâmpadas, com apenas a atual acesa;
 pedestres e ciclistas têm duas, com símbolos próprios. As caixas são
