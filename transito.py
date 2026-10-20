@@ -2,7 +2,7 @@
 
 import pygame
 
-from config import FLUXOS
+from config import FLUXOS, ROTAS_ALTERNATIVAS
 
 
 ESPACAMENTO = {"carro": 55, "onibus": 80, "pessoa": 25, "bicicleta": 40}
@@ -13,9 +13,13 @@ class Transito:
         self.imagens = criar_imagens()
         self.fluxos = []
         for sinal, tipo, velocidade, intervalo, pontos in FLUXOS:
-            pontos = [pygame.Vector2(ponto) for ponto in pontos]
-            comprimentos = [a.distance_to(b) for a, b in zip(pontos, pontos[1:])]
-            parada = comprimentos[0]
+            rotas = []
+            for caminho in [pontos] + ROTAS_ALTERNATIVAS.get(sinal, []):
+                caminho = [pygame.Vector2(ponto) for ponto in caminho]
+                comprimentos = [a.distance_to(b) for a, b in zip(caminho, caminho[1:])]
+                rotas.append({"pontos": caminho, "comprimentos": comprimentos,
+                              "total": sum(comprimentos)})
+            parada = rotas[0]["comprimentos"][0]
             if tipo in ("carro", "onibus"):
                 # As posições representam o centro do veículo. Recuar meia
                 # carroceria e uma margem de 4 pixels deixa a frente fora da faixa.
@@ -23,36 +27,40 @@ class Transito:
                 parada = max(0, parada - recuo)
             self.fluxos.append({
                 "sinal": sinal, "tipo": tipo, "velocidade": velocidade,
-                "intervalo": intervalo, "pontos": pontos, "comprimentos": comprimentos,
-                "parada": parada, "total": sum(comprimentos),
-                "agentes": [0.0], "espera": intervalo,
+                "intervalo": intervalo, "rotas": rotas, "parada": parada,
+                "agentes": [{"distancia": 0.0, "rota": 0}], "espera": intervalo,
+                "proxima_rota": 1 % len(rotas),
             })
 
     def atualizar(self, segundos, estados):
         for fluxo in self.fluxos:
             agentes = fluxo["agentes"]  # Do primeiro da fila até o último.
             espaco = ESPACAMENTO[fluxo["tipo"]]
-            frente = fluxo["total"] + espaco
-            for indice, distancia in enumerate(agentes):
+            frente = float("inf")
+            for agente in agentes:
+                distancia = agente["distancia"]
                 destino = distancia + fluxo["velocidade"] * segundos
                 if distancia <= fluxo["parada"] and estados[fluxo["sinal"]] != "verde":
                     destino = min(destino, fluxo["parada"])
                 destino = min(destino, frente - espaco)
-                agentes[indice] = max(distancia, destino)
-                frente = agentes[indice]
-            fluxo["agentes"] = [distancia for distancia in agentes if distancia < fluxo["total"]]
+                agente["distancia"] = max(distancia, destino)
+                frente = agente["distancia"]
+            fluxo["agentes"] = [a for a in agentes
+                                if a["distancia"] < fluxo["rotas"][a["rota"]]["total"]]
 
             fluxo["espera"] -= segundos
             if fluxo["espera"] <= 0:
                 fila = fluxo["agentes"]
-                if not fila or fila[-1] >= espaco:
-                    fila.append(0.0)
+                if not fila or fila[-1]["distancia"] >= espaco:
+                    fila.append({"distancia": 0.0, "rota": fluxo["proxima_rota"]})
+                    fluxo["proxima_rota"] = (fluxo["proxima_rota"] + 1) % len(fluxo["rotas"])
                     fluxo["espera"] = fluxo["intervalo"]
 
     def desenhar(self, tela, origem, escala, topo_recorte):
         for fluxo in self.fluxos:
-            for distancia in fluxo["agentes"]:
-                posicao, direcao = posicao_no_trajeto(fluxo, distancia)
+            for agente in fluxo["agentes"]:
+                rota = fluxo["rotas"][agente["rota"]]
+                posicao, direcao = posicao_no_trajeto(rota, agente["distancia"])
                 centro = (round(origem[0] + posicao.x * escala),
                           round(origem[1] + (posicao.y - topo_recorte) * escala))
                 # As imagens originais apontam para a direita.

@@ -1,9 +1,11 @@
-"""Dados editáveis. Os tempos e grupos abaixo são fictícios."""
+"""Durações medidas; defasagem da avenida ajustada para eliminar conflitos."""
 
 from datetime import datetime
 
-# Horário local do início da primeira fase.
-REFERENCIA = datetime(2026, 1, 1, 0, 0, 0)
+# Referência local: abertura das ruas laterais registrada às 13:30:37.
+# A data da coleta não foi informada. Como 120 s divide um dia inteiro,
+# usar uma data-base preserva a mesma fase em cada horário de todos os dias.
+REFERENCIA = datetime(2026, 1, 1, 13, 30, 37)
 
 # Identificação, tipo, posição em pixels do mapa original, face visível.
 SINAIS = [
@@ -40,36 +42,51 @@ FACES = [
     ("C2", (401, 893), 0), ("C2", (415, 1142), 0),
 ]
 
+# Coleta nas ruas laterais: V1 (Cristóvão) e V5 (Baltazar).
+# Verde 13:30:37; amarelo 13:31:24; vermelho 13:31:27; verde 13:32:37.
+LATERAIS = ["V1", "V5"]
+
+# Coleta na Faria Lima: verde 13:37:13; amarelo 13:38:17;
+# vermelho 13:38:20; verde 13:39:13.
+AVENIDA = ["V2", "V3", "V4", "V6"]
+# Correção inferida: +15 s em TODOS os instantes da avenida.
+# Verde 13:37:28; amarelo 13:38:32; vermelho 13:38:35; verde 13:39:28.
+AJUSTADOS = AVENIDA
+
+# Tempos inferidos, não medidos: travessias e conversão exclusiva do ônibus.
+ESTIMADOS = ["O1", "P1", "P2", "P3", "P4", "C1", "C2"]
+PEDESTRES = ["P1", "P2", "P3", "P4"]
+
 # Cada fase: segundos, sinais verdes, sinais amarelos.
-# Todos os sinais omitidos ficam vermelhos.
-# Substitua também os grupos pelos movimentos observados na rua.
+# A avenida abre 51 s após a referência: 47 s laterais verdes + 3 s amarelas
+# + 1 s todos vermelhos. Seus 64 s verdes + 3 s amarelos deixam 2 s finais.
+# Mantém as durações da coleta e 120 s de ciclo, sem liberações conflitantes.
+# Pedestres cruzam a avenida no vermelho dela; ciclistas cruzam as laterais
+# no vermelho delas. O ônibus acompanha as laterais, convergindo para o mesmo
+# sentido da Cristóvão, com os carros da avenida fechados. É uma estimativa.
+# Não há tempo para uma fase exclusiva adicional de ônibus neste ciclo.
 FASES = [
-    (25, ["V2", "V3", "V4", "V6"], []),
-    (5, [], ["V2", "V3", "V4", "V6"]),
-    (2, [], []),
-    (15, ["V1", "V5"], []),
-    (5, [], ["V1", "V5"]),
-    (2, [], []),
-    (10, ["O1"], []),
-    (3, [], ["O1"]),
-    (2, [], []),
-    (18, ["P1", "P2", "P3", "P4", "C1", "C2"], []),
-    (3, [], []),
+    (47, LATERAIS + ["O1"] + PEDESTRES, []),
+    (3, PEDESTRES, LATERAIS + ["O1"]),
+    (1, PEDESTRES + ["C1", "C2"], []),
+    (64, AVENIDA + ["C1", "C2"], []),
+    (3, ["C1", "C2"], AVENIDA),
+    (2, PEDESTRES + ["C1", "C2"], []),
 ]
 
 # Fluxos fictícios: sinal, tipo, velocidade (pixels/s), intervalo de chegada (s),
-# pontos do trajeto. Para veículos, o SEGUNDO ponto é o início da faixa
-# de pedestres; o programa recua a carroceria para manter a frente antes dela.
+# pontos do trajeto. Para veículos, o SEGUNDO ponto é a linha de parada.
+# Na Faria Lima ela fica antes do sinal; nas laterais, antes da faixa.
 # Para pessoas e bicicletas, o segundo ponto é a posição de espera.
 # As coordenadas usam a mesma imagem original que SINAIS.
 FLUXOS = [
     # Cristóvão Gonçalves: direita -> esquerda, conforme as setas do mapa.
     ("V1", "carro", 55, 6, [(950, 445), (630, 445), (30, 445)]),
     # Faria Lima: pista direita sobe; pista esquerda desce na imagem.
-    ("V2", "carro", 55, 7, [(495, 650), (490, 415), (475, 230)]),
+    ("V2", "carro", 55, 7, [(495, 650), (492, 550), (490, 415), (475, 230)]),
     ("V3", "carro", 55, 6, [(270, 230), (275, 290), (290, 650)]),
-    ("V4", "carro", 55, 7, [(535, 1230), (520, 850), (495, 650)]),
-    # Baltazar Carrasco aproxima-se pela diagonal e entra na pista que sobe.
+    ("V4", "carro", 55, 7, [(535, 1230), (526, 1040), (520, 850), (495, 650)]),
+    # Baltazar: mesma fila de entrada, alternando os dois destinos abaixo.
     ("V5", "carro", 50, 8, [(950, 600), (650, 815), (575, 875), (520, 850), (495, 650)]),
     ("V6", "carro", 55, 6, [(290, 650), (300, 820), (315, 1230)]),
     # Ônibus sobe pela faixa junto ao canteiro e vira à esquerda na Cristóvão.
@@ -81,3 +98,11 @@ FLUXOS = [
     ("C1", "bicicleta", 35, 10, [(375, 240), (375, 315), (375, 390)]),
     ("C2", "bicicleta", 35, 10, [(380, 980), (380, 910), (375, 820)]),
 ]
+
+# Saídas alternativas após a MESMA aproximação e linha de parada.
+# Os carros alternam entre o trajeto principal e este: metade sobe, metade desce.
+# A saída que desce cruza o vão entre os canteiros, sem cortar a área verde.
+ROTAS_ALTERNATIVAS = {
+    "V5": [[(950, 600), (650, 815), (575, 875), (550, 970),
+             (440, 1040), (340, 1045), (315, 1100), (320, 1230)]],
+}

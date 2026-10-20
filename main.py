@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pygame
 
-from config import FACES, FASES, REFERENCIA, SINAIS
+from config import AJUSTADOS, ESTIMADOS, FACES, FASES, REFERENCIA, SINAIS
 from transito import Transito
 
 
@@ -145,7 +145,7 @@ def main():
         transito.atualizar(segundos, estados)
         tela.fill((25, 30, 40))
         texto("Davi Semáforo", (25, 12))
-        texto("Dados fictícios", (largura - 112, 16), (150, 160, 175), pequeno=True)
+        texto("Coleta + ajustes", (largura - 120, 16), (150, 160, 175), pequeno=True)
         texto(f"Relógio real  {agora:%H:%M:%S}", (25, 39))
         texto(f"Simulação  {simulado:%H:%M:%S}", (largura - 210, 39))
         tela.blit(mapa, origem)
@@ -164,6 +164,12 @@ def main():
             area = desenhar_semaforo(tela, (x, y), tipo, estados[identificacao], angulo)
             if area.collidepoint(mouse):
                 detalhes = f"{identificacao} | {nome} | {estados[identificacao]}"
+                if identificacao in ESTIMADOS:
+                    detalhes += " | estimado"
+                elif identificacao in AJUSTADOS:
+                    detalhes += " | medido, horário +15 s"
+                else:
+                    detalhes += " | medido"
                 pygame.draw.rect(tela, cor_tipo, area.inflate(4, 4), width=1, border_radius=3)
 
         # Os detalhes aparecem apenas ao passar o mouse sobre um sinal.
