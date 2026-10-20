@@ -9,18 +9,24 @@ ESPACAMENTO = {"carro": 55, "onibus": 80, "pessoa": 25, "bicicleta": 40}
 
 
 class Transito:
-    def __init__(self):
+    def __init__(self, escala=1):
+        self.imagens = criar_imagens()
         self.fluxos = []
         for sinal, tipo, velocidade, intervalo, pontos in FLUXOS:
             pontos = [pygame.Vector2(ponto) for ponto in pontos]
             comprimentos = [a.distance_to(b) for a, b in zip(pontos, pontos[1:])]
+            parada = comprimentos[0]
+            if tipo in ("carro", "onibus"):
+                # As posições representam o centro do veículo. Recuar meia
+                # carroceria e uma margem de 4 pixels deixa a frente fora da faixa.
+                recuo = (self.imagens[tipo].get_width() / 2 + 4) / escala
+                parada = max(0, parada - recuo)
             self.fluxos.append({
                 "sinal": sinal, "tipo": tipo, "velocidade": velocidade,
                 "intervalo": intervalo, "pontos": pontos, "comprimentos": comprimentos,
-                "parada": comprimentos[0], "total": sum(comprimentos),
+                "parada": parada, "total": sum(comprimentos),
                 "agentes": [0.0], "espera": intervalo,
             })
-        self.imagens = criar_imagens()
 
     def atualizar(self, segundos, estados):
         for fluxo in self.fluxos:

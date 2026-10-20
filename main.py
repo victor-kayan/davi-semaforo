@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pygame
 
-from config import FASES, REFERENCIA, SINAIS
+from config import FACES, FASES, REFERENCIA, SINAIS
 from transito import Transito
 
 
@@ -41,45 +41,46 @@ def calcular_estados(horario):
         posicao -= duracao
 
 
-def desenhar_semaforo(tela, posicao, tipo, estado, direcao):
-    """A base fica voltada a quem vê a luz; a seta aponta o fluxo até ela."""
-    cores_lampadas = ["vermelho", "amarelo", "verde"]
+def desenhar_semaforo(tela, posicao, tipo, estado, angulo):
+    """Faces horizontais giradas sobre o mapa, conforme a imagem modelo."""
+    lampadas = ["vermelho", "amarelo", "verde"]
     if tipo in ("pedestre", "ciclista"):
-        cores_lampadas = ["vermelho", "verde"]
-    angulo = {None: 0, "baixo": 0, "cima": 180, "esquerda": 270, "direita": 90}[direcao]
-
-    altura_caixa = 12 * len(cores_lampadas) + 4
-    desenho = pygame.Surface((24, altura_caixa + 22), pygame.SRCALPHA)
-    caixa = pygame.Rect(2, 1, 20, altura_caixa)
-    pygame.draw.rect(desenho, (24, 26, 29), caixa, border_radius=4)
-    pygame.draw.rect(desenho, TIPOS[tipo][1], caixa, width=2, border_radius=4)
-    for indice, nome_cor in enumerate(cores_lampadas):
-        y = 9 + indice * 12
+        lampadas = ["verde", "vermelho"]
+    largura = len(lampadas) * 12 + 4
+    desenho = pygame.Surface((largura, 24), pygame.SRCALPHA)
+    if tipo == "pedestre":
+        # Abas laterais representam as viseiras das duas faces.
+        for x in (3, 15):
+            pygame.draw.polygon(desenho, (38, 40, 42), [(x, 5), (x + 10, 0), (x + 10, 24), (x, 19)])
+    caixa = pygame.Rect(0, 4, largura, 16)
+    pygame.draw.rect(desenho, (23, 25, 28), caixa, border_radius=2)
+    for indice, nome_cor in enumerate(lampadas):
+        x, y = 8 + indice * 12, 12
         acesa = nome_cor == estado
-        cor = CORES[nome_cor] if acesa else (57, 60, 63)
-        pygame.draw.circle(desenho, (10, 12, 14), (12, y), 6)
-        pygame.draw.circle(desenho, cor, (12, y), 5)
-        if tipo == "onibus":
-            # A seta de conversão fica dentro da lâmpada acesa.
-            # Compensa o giro da caixa para manter a seta à esquerda no mapa.
+        cor = CORES[nome_cor] if acesa else (56, 59, 62)
+        pygame.draw.circle(desenho, (8, 10, 12), (x, y), 6)
+        pygame.draw.circle(desenho, cor, (x, y), 5)
+        simbolo = (15, 22, 20) if acesa else (100, 105, 108)
+        if tipo == "onibus" and acesa:
             vetor = pygame.Vector2(-1, 0).rotate(angulo)
-            centro = pygame.Vector2(12, y)
+            centro = pygame.Vector2(x, y)
             lado = pygame.Vector2(-vetor.y, vetor.x)
-            pygame.draw.line(desenho, (20, 22, 25), centro - vetor * 3, centro + vetor * 3, 2)
-            pygame.draw.polygon(desenho, (20, 22, 25),
+            pygame.draw.line(desenho, simbolo, centro - vetor * 3, centro + vetor * 3, 2)
+            pygame.draw.polygon(desenho, simbolo,
                                 [centro + vetor * 4, centro + lado * 3, centro - lado * 3])
-        elif acesa:
-            pygame.draw.circle(desenho, (245, 245, 230), (10, y - 2), 1)
-
-    if direcao:
-        # No desenho original, a luz é vista de baixo e o fluxo sobe até ela.
-        base = altura_caixa + 4
-        pygame.draw.line(desenho, (28, 30, 33), (12, altura_caixa), (12, base), 4)
-        pygame.draw.line(desenho, (28, 30, 33), (12, base + 14), (12, base + 4), 2)
-        pygame.draw.polygon(desenho, (28, 30, 33),
-                            [(12, base + 3), (8, base + 8), (16, base + 8)])
-        desenho = pygame.transform.rotate(desenho, angulo)
-
+        elif tipo == "pedestre":
+            pygame.draw.circle(desenho, simbolo, (x, y - 3), 1)
+            pygame.draw.line(desenho, simbolo, (x, y - 1), (x, y + 2))
+            pygame.draw.lines(desenho, simbolo, False, [(x - 2, y + 4), (x, y + 1), (x + 2, y + 4)])
+            pygame.draw.line(desenho, simbolo, (x - 3, y), (x + 3, y))
+        elif tipo == "ciclista":
+            pygame.draw.circle(desenho, simbolo, (x - 3, y + 2), 2, 1)
+            pygame.draw.circle(desenho, simbolo, (x + 3, y + 2), 2, 1)
+            pygame.draw.lines(desenho, simbolo, False, [(x - 3, y + 2), (x, y - 2), (x + 3, y + 2), (x - 3, y + 2)])
+            pygame.draw.circle(desenho, simbolo, (x + 1, y - 4), 1)
+    if tipo in ("auto", "onibus"):
+        desenho = pygame.transform.smoothscale(desenho, (30, 18))
+    desenho = pygame.transform.rotate(desenho, angulo)
     area = desenho.get_rect(center=posicao)
     tela.blit(desenho, area)
     return area
@@ -93,7 +94,6 @@ def main():
     pygame.display.set_caption("Davi Semáforo")
     fonte = pygame.font.SysFont("arial", 18)
     pequena = pygame.font.SysFont("arial", 14)
-    rotulo = pygame.font.SysFont("arial", 11, bold=True)
     relogio = pygame.time.Clock()
 
     mapa = pygame.image.load(str(Path(__file__).with_name("mapa.jpeg"))).convert()
@@ -109,7 +109,7 @@ def main():
     deslocamento = 0
     arrastando = False
     executando = True
-    transito = Transito()
+    transito = Transito(escala)
     deslocamento_anterior = 0
 
     def texto(conteudo, posicao, cor=(225, 230, 238), pequeno=False):
@@ -140,7 +140,7 @@ def main():
         estados, _ = calcular_estados(simulado)
         # Ao buscar outro horário, começa um novo fluxo naquele instante.
         if deslocamento != deslocamento_anterior:
-            transito = Transito()
+            transito = Transito(escala)
             deslocamento_anterior = deslocamento
         transito.atualizar(segundos, estados)
         tela.fill((25, 30, 40))
@@ -155,29 +155,16 @@ def main():
 
         detalhes = None
         mouse = pygame.mouse.get_pos()
-        for identificacao, tipo, (x, y), direcao in SINAIS:
+        tipos_sinais = {identificacao: tipo for identificacao, tipo, _, _ in SINAIS}
+        for identificacao, (x, y), angulo in FACES:
+            tipo = tipos_sinais[identificacao]
             x = origem[0] + round(x * escala)
             y = origem[1] + round((y - recorte.top) * escala)
-            # Afasta os sinais próximos para que as caixas não se sobreponham.
-            ajustes = {"P2": (22, -20), "V2": (22, 20), "C1": (-6, -8), "P4": (-18, -12)}
-            dx, dy = ajustes.get(identificacao, (0, 0))
-            if dx or dy:
-                pygame.draw.line(tela, (95, 103, 112), (x, y), (x + dx, y + dy))
-            x += dx
-            y += dy
             nome, cor_tipo = TIPOS[tipo]
-            area = desenhar_semaforo(tela, (x, y), tipo, estados[identificacao], direcao)
-            # Identificação curta, sempre horizontal, sem depender só da cor.
-            etiqueta = rotulo.render(identificacao, True, cor_tipo)
-            caixa_rotulo = etiqueta.get_rect(midbottom=(x, area.top - 2)).inflate(6, 2)
-            if identificacao == "V1":
-                caixa_rotulo.midtop = (x, area.bottom + 2)
-            pygame.draw.rect(tela, (25, 30, 40), caixa_rotulo, border_radius=3)
-            tela.blit(etiqueta, etiqueta.get_rect(center=caixa_rotulo.center))
+            area = desenhar_semaforo(tela, (x, y), tipo, estados[identificacao], angulo)
             if area.collidepoint(mouse):
-                detalhes = f"{identificacao} · {nome} · {estados[identificacao]}"
-                if direcao:
-                    detalhes += f" · visto de {direcao}"
+                detalhes = f"{identificacao} | {nome} | {estados[identificacao]}"
+                pygame.draw.rect(tela, cor_tipo, area.inflate(4, 4), width=1, border_radius=3)
 
         # Os detalhes aparecem apenas ao passar o mouse sobre um sinal.
         if detalhes:
